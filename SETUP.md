@@ -77,7 +77,7 @@ The workflow uses the verified Resend community node.
    | --- | --- | --- |
    | `SECRET_SANTA_ADMIN_TOKEN` | Yes | Organizer login token. |
    | `SECRET_SANTA_EMAIL_FROM` | For email | Verified Resend sender, e.g. `Jani Secret Santa <santa@yourdomain.com>`. |
-   | `SECRET_SANTA_APP_BASE_URL` | Optional | Overrides the frontend URL from the browser when building email links. |
+   | `SECRET_SANTA_APP_BASE_URL` | Optional | Overrides the frontend URL from the browser when building email links. Use the full URL including `https://`, e.g. `https://YOUR-USERNAME.github.io/YOUR-REPO/`. |
 
    - **Self-hosted n8n:** set the variables in the n8n environment and restart n8n.
    - **Any n8n instance, including Cloud:** you can instead edit the fallback constants in the Code node:
@@ -468,6 +468,7 @@ Relevant error codes include `PARTICIPANT_NOT_FOUND`, `DRAW_NOT_COMPLETE`, `ALRE
 | “Could not reach the n8n backend” | Wrong URL, inactive workflow, HTTP/HTTPS mismatch, or CORS | Copy the Production URL, activate the workflow, use HTTPS. |
 | `adminConfigured: false` | Token missing or under 16 characters | Set the admin token, save, activate. |
 | `emailConfigured: false` | Sender not set | Set `SECRET_SANTA_EMAIL_FROM` or `EMAIL_FROM_FALLBACK`. |
+| “The frontend URL is not valid” | `SECRET_SANTA_APP_BASE_URL` is set to an incomplete value, or the browser sent an invalid base URL | Clear `SECRET_SANTA_APP_BASE_URL` so the frontend supplies its own URL, or set it to the full `https://...` Pages URL. The updated workflow falls back to the browser URL if the optional setting is invalid. |
 | Email buttons disabled | Email not configured | Configure the sender and refresh the dashboard. |
 | “Could not find node type n8n-nodes-resend.resend” | Resend node not installed | Install the verified Resend community node, then reopen the workflow. |
 | `EMAIL_SEND_FAILED` | Missing/invalid Resend credential, unverified sender domain, or provider rejection | Attach the Resend API credential and verify the sender domain. Check n8n executions. Some sends may have succeeded before the failure, so retry individual invitations rather than blasting everyone again. |
