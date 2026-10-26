@@ -21,15 +21,11 @@ The frontend is deliberately a single `index.html` with inline CSS and JavaScrip
   - A self-hosted n8n instance works if it has a public HTTPS URL.
 - A GitHub account for GitHub Pages.
 - One person to act as the organizer.
-- A long random **admin token**. Use at least 32 random characters. Do not reuse a password.
+- A private **organizer admin token**. This build already has one configured as a SHA-256 verifier; keep the plaintext token private.
 - A **Resend** account with an API key and a verified sending domain, if you want invite emails sent from n8n.
 - A native n8n **Data Table** for the backup snapshot.
 
-Generate an admin token locally:
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+If you change the admin token later, generate a replacement and its verifier with the instructions in section 3.2.
 
 > If n8n is on plain HTTP and the app is on GitHub Pages, browsers will block the API calls as mixed content. Use an HTTPS n8n URL.
 
@@ -63,38 +59,31 @@ The workflow uses the verified Resend community node.
 1. In n8n, open **Workflows**.
 2. Choose **Import from File** and select `n8n/secret-santa-workflow.json`.
 3. Open the **Secret Santa API** Code node.
-4. Find these lines near the top:
+4. The workflow is already self-contained. It does not use any environment variables:
 
-   ```js
-   const ADMIN_TOKEN_FALLBACK = '';
-   const APP_BASE_URL_FALLBACK = 'https://fractal-solutions.github.io/secret-santa/';
-   const EMAIL_FROM_FALLBACK = '';
-   ```
+   - The organizer token is stored only as a SHA-256 verifier:
 
-5. Configure the values. The app base URL is intentionally hardcoded in the Code node so no n8n environment permissions are needed:
+     ```js
+     const ADMIN_TOKEN_SHA256_FALLBACK = '...';
+     ```
 
-   | Setting | Required | Purpose |
-   | --- | --- | --- |
-   | `SECRET_SANTA_ADMIN_TOKEN` env or `ADMIN_TOKEN_FALLBACK` | Yes | Organizer login token. |
-   | `SECRET_SANTA_EMAIL_FROM` env or `EMAIL_FROM_FALLBACK` | For email | Verified Resend sender, e.g. `Jani Secret Santa <santa@yourdomain.com>`. |
-   | `APP_BASE_URL_FALLBACK` | Yes | Public GitHub Pages URL used in emailed invite links. It is set in the Code node and does not require an environment variable. |
+   - The verified Resend sender is hardcoded:
 
-   If your Pages domain or repository path changes, update `APP_BASE_URL_FALLBACK` in the Code node.
+     ```js
+     const EMAIL_FROM_FALLBACK = 'santa@janibeauty.co.ke';
+     ```
 
-   You can either use environment variables for the admin token and email sender, or edit the fallback constants directly in the Code node:
+   - Invite links are built from the URL currently open in the browser. Open the app from the GitHub Pages URL when sending emails.
 
-   ```js
-   const ADMIN_TOKEN_FALLBACK = 'your-long-random-admin-token';
-   const APP_BASE_URL_FALLBACK = 'https://fractal-solutions.github.io/secret-santa/';
-   const EMAIL_FROM_FALLBACK = 'Jani Secret Santa <santa@yourdomain.com>';
-   ```
-
-   The admin token must be at least 16 characters. The email sender must contain an `@` and must belong to a domain verified in Resend.
-
-   > Do not commit or share the workflow after filling in secrets.
-
+5. Log in as organizer using the admin token you configured. The plaintext token is not stored in the workflow.
 6. Attach the **Resend API** credential to the **Send invite email** node.
 7. Save the workflow.
+
+The sender domain must be verified in Resend. If you ever change the admin token, generate a new SHA-256 verifier and replace `ADMIN_TOKEN_SHA256_FALLBACK`:
+
+```bash
+node -e "console.log(require('crypto').createHash('sha256').update('YOUR_NEW_TOKEN').digest('hex'))"
+```
 
 ### 3.3 Create the Data Table backup
 
@@ -164,8 +153,8 @@ Expected:
 }
 ```
 
-- `adminConfigured: false` — set the admin token and re-save/activate.
-- `emailConfigured: false` — set `SECRET_SANTA_EMAIL_FROM` or `EMAIL_FROM_FALLBACK`.
+- `adminConfigured: false` — check `ADMIN_TOKEN_SHA256_FALLBACK` in the Code node and re-save/activate.
+- `emailConfigured: false` — check `EMAIL_FROM_FALLBACK` in the Code node.
 - After adding a participant, open **Data tables → Secret Santa Backup** and confirm the `main` row's `updated_at` changed. If it did not, check the table name and columns.
 
 ---
@@ -241,7 +230,7 @@ The email includes:
 
 The link is built from:
 
-- The configured `APP_BASE_URL_FALLBACK` in the Code node.
+- The URL currently open in the browser. Open the app from the Pages URL when sending emails.
 - The n8n webhook URL configured in the frontend (normally the Production URL).
 - The participant's private invite token.
 
@@ -467,13 +456,13 @@ Relevant error codes include `PARTICIPANT_NOT_FOUND`, `DRAW_NOT_COMPLETE`, `ALRE
 | Problem | Likely cause | Fix |
 | --- | --- | --- |
 | “Could not reach the n8n backend” | Wrong URL, inactive workflow, HTTP/HTTPS mismatch, or CORS | Copy the Production URL, activate the workflow, use HTTPS. |
-| `adminConfigured: false` | Token missing or under 16 characters | Set the admin token, save, activate. |
-| `emailConfigured: false` | Sender not set | Set `SECRET_SANTA_EMAIL_FROM` or `EMAIL_FROM_FALLBACK`. |
-| “The frontend URL is not valid” | `APP_BASE_URL_FALLBACK` is incorrect, or the active workflow is running an older published version | Set `APP_BASE_URL_FALLBACK` to the full `https://...` Pages URL, save, and publish/activate the workflow. |
+| `adminConfigured: false` | SHA-256 verifier missing/invalid in the Code node | Restore `ADMIN_TOKEN_SHA256_FALLBACK`, save, activate. |
+| Organizer sign-in returns 401 | The entered token does not match the stored SHA-256 verifier | Use the original admin token. If you changed it, generate and set a new verifier. |
+| `emailConfigured: false` | Sender not set | Set `EMAIL_FROM_FALLBACK` in the Code node. |
 | Email buttons disabled | Email not configured | Configure the sender and refresh the dashboard. |
 | “Could not find node type n8n-nodes-resend.resend” | Resend node not installed | Install the verified Resend community node, then reopen the workflow. |
 | `EMAIL_SEND_FAILED` | Missing/invalid Resend credential, unverified sender domain, or provider rejection | Attach the Resend API credential and verify the sender domain. Check n8n executions. Some sends may have succeeded before the failure, so retry individual invitations rather than blasting everyone again. |
-| Invite emails arrive with test URLs | Emails sent from the n8n editor/test webhook | Use the Production webhook URL in the app. |
+| Invite emails point to localhost or the wrong path | The app was opened from a local/preview URL when the emails were sent | Open the app from the public GitHub Pages URL and send the invitations again. |
 | Email all only reaches some people | Only active participants are included | Activate the missing participants or send individual invites. |
 | Data Table backup not updating | Table missing or columns wrong | Create `Secret Santa Backup` with `state_key`, `snapshot`, `updated_at`. |
 | CSV import rejected | Missing name/email header, invalid email, duplicate email, or invalid company | Fix the reported row and retry. Imports are all-or-nothing. |
@@ -511,8 +500,8 @@ Relevant error codes include `PARTICIPANT_NOT_FOUND`, `DRAW_NOT_COMPLETE`, `ALRE
 ## 12. Customizing
 
 - **Gift budget:** edit `BUDGET` in the **Secret Santa API** Code node and the fallback in `formatBudget()` in `index.html`.
-- **Email sender:** set `SECRET_SANTA_EMAIL_FROM` or `EMAIL_FROM_FALLBACK`. The sender must be verified in Resend.
-- **Email links base URL:** edit `APP_BASE_URL_FALLBACK` in the Code node if the Pages domain or path changes.
+- **Email sender:** edit `EMAIL_FROM_FALLBACK` in the Code node. The sender must be verified in Resend.
+- **Admin token:** generate a new SHA-256 verifier and replace `ADMIN_TOKEN_SHA256_FALLBACK`. Sign in with the new plaintext token.
 - **Participant cap:** adjust `MAX_BULK_PARTICIPANTS` and `MAX_INVITE_EMAILS` in the Code node.
 - **Webhook path:** change the Webhook node path, then update the frontend connection settings.
 - **CORS:** change the Webhook node's Allowed Origins option.
@@ -524,7 +513,7 @@ Relevant error codes include `PARTICIPANT_NOT_FOUND`, `DRAW_NOT_COMPLETE`, `ALRE
 ## 13. Quick n8n Cloud notes
 
 - Install the verified Resend node before activating the workflow.
-- If custom environment variables are unavailable, use the fallback constants in the Code node.
+- No environment variables are required. The admin verifier and email sender are in the Code node.
 - Use the Production URL, not the test URL.
 - The workflow must remain active.
 - n8n Cloud execution limits apply to the email batch. The app caps a single email send at 100 recipients.

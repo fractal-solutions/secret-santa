@@ -3499,13 +3499,6 @@
         return `${base.toString()}#${params.toString()}`;
       }
 
-      function appBaseUrl() {
-        const url = new URL(window.location.href);
-        url.search = "";
-        url.hash = "";
-        return url.toString();
-      }
-
       function csvCell(value) {
         const text = String(value ?? "");
         const safe = /^[=+\-@]/.test(text) ? `'${text}` : text;
@@ -3749,20 +3742,31 @@
 
       async function sendInviteEmails(options, button = null, errorPrefix = "") {
         if (!state.admin) return;
-        const payload = {
-          appBaseUrl: appBaseUrl(),
-        };
-        if (options.sendAll) {
-          payload.sendAll = true;
-        } else {
-          payload.participantIds = options.participantIds || [];
+
+        const requestedIds = Array.isArray(options.participantIds)
+          ? new Set(options.participantIds.map((id) => String(id || "")).filter(Boolean))
+          : null;
+        const targets = state.admin.participants.filter((participant) => {
+          if (requestedIds) return requestedIds.has(participant.id);
+          return Boolean(participant.participating);
+        });
+
+        if (targets.length === 0) {
+          toast("There are no participants to email.", "error");
+          return;
         }
+
+        const invitations = targets.map((participant) => ({
+          participantId: participant.id,
+          inviteLink: inviteLinkFor(participant),
+        }));
 
         const task = async () => {
           try {
             const result = await apiRequest("admin_email_invites", {
               token: state.adminToken,
-              data: payload,
+              data: { invitations },
+              timeout: 90000,
             });
             const sent = Number(result.sent ?? result.queued ?? 0);
             toast(sent === 1 ? "Invite email sent." : `${sent} invite emails sent.`);
