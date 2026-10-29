@@ -3353,7 +3353,7 @@
                     <th>Status</th>
                   </tr>
                 </thead>
-                <tbody>${rows}</tbody>
+                <tbody>${rows || `<tr><td colspan="4" class="empty-pairings">No pairings are available yet. They will appear here when assignments are available.</td></tr>`}</tbody>
               </table>
             </div>
           </section>`;
@@ -3410,7 +3410,7 @@
                 <button class="btn btn--primary btn--sm" type="button" data-action="add-participant" ${locked ? "disabled" : ""}>${icon("plus")} Add participant</button>
                 <button class="btn btn--ghost btn--sm" type="button" data-action="import-participants" ${locked ? "disabled" : ""}>Import CSV</button>
                 <button class="btn btn--accent btn--sm" type="button" data-action="run-draw" ${canRun ? "" : "disabled"}>Run draw</button>
-                <button class="btn btn--ghost btn--sm" type="button" data-action="toggle-pairings" ${complete ? "" : "disabled"}>${state.showPairings ? "Hide pairings" : "View pairings"}</button>
+                <button class="btn btn--ghost btn--sm" type="button" data-action="toggle-pairings">${state.showPairings ? "Hide pairings" : "View pairings"}</button>
                 <button class="btn btn--danger btn--sm" type="button" data-action="reset-draw" ${complete ? "" : "disabled"}>Reset draw</button>
               </div>
             </div>
@@ -3434,7 +3434,7 @@
               ${participantTable(admin)}
             </section>
 
-            ${state.showPairings && complete ? pairingsPanel(admin) : ""}
+            ${state.showPairings ? pairingsPanel(admin) : ""}
 
             <footer class="app-footer app-footer--admin">
               <span>Private admin view · ${escapeHtml(admin.eventName)}</span>
@@ -4402,4 +4402,3 @@
   </script>
 </body>
 </html>
-
